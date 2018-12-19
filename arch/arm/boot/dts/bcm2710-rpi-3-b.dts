@@ -2,7 +2,6 @@
 
 #include "bcm2710.dtsi"
 #include "bcm283x-rpi-smsc9514.dtsi"
-#include "../../../../include/dt-bindings/mux/mux.h"
 
 / {
 	compatible = "raspberrypi,3-model-b", "brcm,bcm2837";
@@ -16,17 +15,14 @@
 		serial0 = &uart1;
 		serial1 = &uart0;
 	};
-	adc-mux@3 {
-		compatible = "io-channel-mux";
-		io-channels = <&adc 1>;
-		io-channel-names = "parent";
-		mux-controls = <&mux>;
 
-		channels = "out_a0", "out_a1", "test0", "test1",
-			"out_b0", "out_b1", "testb0", "testb1";
-
-	};
-
+			adc_vref: fixedregulator@0 {
+				compatible = "regulator-fixed";
+				regulator-name = "fixed-supply";
+				regulator-min-microvolt = <2500000>;
+				regulator-max-microvolt = <2500000>;
+				regulator-boot-on;
+			};
 };
 
 &gpio {
@@ -130,6 +126,15 @@
 	cs-gpios = <&gpio 8 1>, <&gpio 7 1>;
 	status = "okay";
 
+	ad9834@0 {
+		compatible = "ad9834";
+		reg = <0>;
+		spi-cpol;
+		spi-max-frequency = <1000000>;
+		avdd-supply = <&adc_vref>;
+	};
+
+#if 0
 	spidev0: spidev@0{
 		compatible = "spidev";
 		reg = <0>;	/* CE0 */
@@ -137,7 +142,7 @@
 		#size-cells = <0>;
 		spi-max-frequency = <125000000>;
 	};
-
+#endif
 	spidev1: spidev@1{
 		compatible = "spidev";
 		reg = <1>;	/* CE1 */
@@ -145,27 +150,12 @@
 		#size-cells = <0>;
 		spi-max-frequency = <125000000>;
 	};
-	mux: mux-controller@2 {
-		compatible = "adi,adgs1408";
-		reg = <0>;
-		spi-max-frequency = <1000000>;
-		#mux-control-cells = <0>;
-	};
-
-	adc: ad7298@3 {
-		compatible = "ad7298";
-		#io-channel-cells = <1>;
-		spi-max-frequency = <1000000>;
-		reg = <1>;
-	};
-
 };
 
 &i2c0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c0_pins>;
 	clock-frequency = <100000>;
-	status = "okay";
 };
 
 &i2c1 {

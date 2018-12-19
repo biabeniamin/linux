@@ -391,36 +391,52 @@ static const struct iio_info ad9833_info = {
 
 static int ad9834_probe(struct spi_device *spi)
 {
-	struct ad9834_platform_data *pdata = dev_get_platdata(&spi->dev);
+	//struct ad9834_platform_data *pdata = dev_get_platdata(&spi->dev);
 	struct ad9834_state *st;
 	struct iio_dev *indio_dev;
 	struct regulator *reg;
 	int ret;
+	struct ad9834_platform_data pdata = {
+		.mclk = 75000000,
+		.freq0 = 1000000,
+		.freq1 = 5000000,
+		.phase0 = 512,
+		.phase1 = 1024,
+		.en_div2 = false,
+		.en_signbit_msb_out = false,
+	};
 
+	pr_err("spi: ad9834: Hello!\n");
+#if 0
 	if (!pdata) {
 		dev_dbg(&spi->dev, "no platform data?\n");
 		return -ENODEV;
 	}
+#endif
+	pr_err("I'm here: %d\n", __LINE__);
 
 	reg = devm_regulator_get(&spi->dev, "avdd");
 	if (IS_ERR(reg))
 		return PTR_ERR(reg);
 
+	pr_err("I'm here: %d\n", __LINE__);
 	ret = regulator_enable(reg);
 	if (ret) {
 		dev_err(&spi->dev, "Failed to enable specified AVDD supply\n");
 		return ret;
 	}
 
+	pr_err("I'm here: %d\n", __LINE__);
 	indio_dev = devm_iio_device_alloc(&spi->dev, sizeof(*st));
 	if (!indio_dev) {
 		ret = -ENOMEM;
 		goto error_disable_reg;
 	}
+	pr_err("I'm here: %d\n", __LINE__);
 	spi_set_drvdata(spi, indio_dev);
 	st = iio_priv(indio_dev);
 	mutex_init(&st->lock);
-	st->mclk = pdata->mclk;
+	st->mclk = pdata.mclk;
 	st->spi = spi;
 	st->devid = spi_get_device_id(spi)->driver_data;
 	st->reg = reg;
@@ -437,6 +453,7 @@ static int ad9834_probe(struct spi_device *spi)
 	}
 	indio_dev->modes = INDIO_DIRECT_MODE;
 
+	pr_err("I'm here: %d\n", __LINE__);
 	/* Setup default messages */
 
 	st->xfer.tx_buf = &st->data;
@@ -457,10 +474,11 @@ static int ad9834_probe(struct spi_device *spi)
 
 	st->control = AD9834_B28 | AD9834_RESET;
 
-	if (!pdata->en_div2)
+	pr_err("I'm here: %d\n", __LINE__);
+	if (!pdata.en_div2)
 		st->control |= AD9834_DIV2;
 
-	if (!pdata->en_signbit_msb_out && (st->devid == ID_AD9834))
+	if (!pdata.en_signbit_msb_out && (st->devid == ID_AD9834))
 		st->control |= AD9834_SIGN_PIB;
 
 	st->data = cpu_to_be16(AD9834_REG_CMD | st->control);
@@ -470,19 +488,22 @@ static int ad9834_probe(struct spi_device *spi)
 		goto error_disable_reg;
 	}
 
-	ret = ad9834_write_frequency(st, AD9834_REG_FREQ0, pdata->freq0);
+	pr_err("I'm here: %d\n", __LINE__);
+	ret = ad9834_write_frequency(st, AD9834_REG_FREQ0, pdata.freq0);
 	if (ret)
 		goto error_disable_reg;
 
-	ret = ad9834_write_frequency(st, AD9834_REG_FREQ1, pdata->freq1);
+	pr_err("I'm here: %d\n", __LINE__);
+	ret = ad9834_write_frequency(st, AD9834_REG_FREQ1, pdata.freq1);
 	if (ret)
 		goto error_disable_reg;
 
-	ret = ad9834_write_phase(st, AD9834_REG_PHASE0, pdata->phase0);
+	pr_err("I'm here: %d\n", __LINE__);
+	ret = ad9834_write_phase(st, AD9834_REG_PHASE0, pdata.phase0);
 	if (ret)
 		goto error_disable_reg;
 
-	ret = ad9834_write_phase(st, AD9834_REG_PHASE1, pdata->phase1);
+	ret = ad9834_write_phase(st, AD9834_REG_PHASE1, pdata.phase1);
 	if (ret)
 		goto error_disable_reg;
 
