@@ -127,7 +127,7 @@
 	status = "okay";
 
 	ad9834@0 {
-		compatible = "ad9834";
+		compatible = "ad9833";
 		reg = <0>;
 		spi-cpol;
 		spi-max-frequency = <1000000>;
