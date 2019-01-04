@@ -16,13 +16,6 @@
 		serial1 = &uart0;
 	};
 
-			adc_vref: fixedregulator@0 {
-				compatible = "regulator-fixed";
-				regulator-name = "fixed-supply";
-				regulator-min-microvolt = <2500000>;
-				regulator-max-microvolt = <2500000>;
-				regulator-boot-on;
-			};
 };
 
 &gpio {
@@ -125,15 +118,9 @@
 	pinctrl-0 = <&spi0_pins &spi0_cs_pins>;
 	cs-gpios = <&gpio 8 1>, <&gpio 7 1>;
 	status = "okay";
-	
-ad9834@0 {
-		compatible = "ad9833";
-		reg = <0>;
-		spi-cpol;
-		spi-max-frequency = <1000000>;
-		avdd-supply = <&adc_vref>;
-	};
 
+
+#if 0
 	spidev0: spidev@0{
 		compatible = "spidev";
 		reg = <0>;	/* CE0 */
@@ -141,6 +128,7 @@ ad9834@0 {
 		#size-cells = <0>;
 		spi-max-frequency = <125000000>;
 	};
+#endif
 	spidev1: spidev@1{
 		compatible = "spidev";
 		reg = <1>;	/* CE1 */
