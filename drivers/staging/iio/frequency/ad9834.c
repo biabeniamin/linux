@@ -397,7 +397,7 @@ static int ad9834_probe(struct spi_device *spi)
 	struct regulator *reg;
 	int ret;
 	struct ad9834_platform_data pdata = {
-		.mclk = 75000000,
+		.mclk = 25000000,
 		.freq0 = 1000000,
 		.freq1 = 5000000,
 		.phase0 = 512,
