@@ -23,6 +23,38 @@
 #include <linux/iio/sysfs.h>
 #include "dds.h"
 
+#include <linux/clk.h>
+#include <linux/clkdev.h>
+#include <linux/clk-provider.h>
+
+
+#include <linux/module.h>
+#include <linux/device.h>
+#include <linux/kernel.h>
+#include <linux/slab.h>
+#include <linux/spi/spi.h>
+#include <linux/err.h>
+#include <linux/delay.h>
+#include <linux/io.h>
+#include <linux/string.h>
+#include <linux/debugfs.h>
+#include <linux/uaccess.h>
+#include <linux/firmware.h>
+
+#include <linux/of.h>
+#include <linux/of_gpio.h>
+#include <linux/gpio/consumer.h>
+
+#include <asm/unaligned.h>
+
+#include <linux/iio/iio.h>
+#include <linux/iio/sysfs.h>
+
+#include <linux/clk.h>
+#include <linux/clkdev.h>
+#include <linux/clk-provider.h>
+
+
 #include "ad9834.h"
 
 /* Registers */
@@ -396,9 +428,17 @@ static int ad9834_probe(struct spi_device *spi)
 	struct iio_dev *indio_dev;
 	struct regulator *reg;
 	int ret;
+	
+	struct clk *c;
+
+	c=devm_clk_get(&spi->dev,NULL);
+	clk_prepare_enable(c);
+	printk("clock is %x\n", c);
+	printk("clock freq is %d\n", clk_get_rate(c));
+	//printk("clock name is %x\n", c->rate);
 
 	struct ad9834_platform_data pdata = {
-		.mclk = 25000000,
+		.mclk = clk_get_rate(c),
 		.freq0 = 1000000,
 		.freq1 = 5000000,
 		.phase0 = 512,
@@ -406,6 +446,7 @@ static int ad9834_probe(struct spi_device *spi)
 		.en_div2 = false,
 		.en_signbit_msb_out = false,
 	};
+printk("clock setted is %d", pdata.mclk);
 pr_err("I'm here: %d\n", __LINE__);
 #if 0
 	if (!pdata) {
