@@ -14,6 +14,7 @@
 				regulator-max-microvolt = <2500000>;
 				regulator-boot-on;
 			};
+
 		};
 	};
 
@@ -25,7 +26,7 @@
 			status = "okay";
 
 			ad9434@0{
-				compatible = "ad9434";
+				compatible = "ad9834";
 				reg = <0>;
 				spi-max-frequency = <1000000>;
 				spi-cpha;
