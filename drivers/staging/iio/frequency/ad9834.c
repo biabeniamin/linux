@@ -428,17 +428,14 @@ static int ad9834_probe(struct spi_device *spi)
 	struct iio_dev *indio_dev;
 	struct regulator *reg;
 	int ret;
-	
-	struct clk *c;
+	struct clk *clk;
 
-	c=devm_clk_get(&spi->dev,NULL);
-	clk_prepare_enable(c);
-	printk("clock is %x\n", c);
-	printk("clock freq is %d\n", clk_get_rate(c));
+	clk=devm_clk_get(&spi->dev,NULL);
+	printk("clock freq is %d\n", clk_get_rate(clk));
 	//printk("clock name is %x\n", c->rate);
 
 	struct ad9834_platform_data pdata = {
-		.mclk = clk_get_rate(c),
+		.mclk = clk_get_rate(clk),
 		.freq0 = 1000000,
 		.freq1 = 5000000,
 		.phase0 = 512,
@@ -455,6 +452,11 @@ pr_err("I'm here: %d\n", __LINE__);
 		//return -ENODEV;
 	}
 #endif
+
+	ret = clk_prepare_enable(c);
+	if(ret)
+		return ret;
+
 	reg = devm_regulator_get(&spi->dev, "avdd");
 	if (IS_ERR(reg))
 		return PTR_ERR(reg);
