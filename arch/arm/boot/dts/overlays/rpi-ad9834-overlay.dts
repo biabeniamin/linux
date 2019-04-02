@@ -1,6 +1,7 @@
 /dts-v1/;
 /plugin/;
 
+#include "../../../../../include/dt-bindings/gpio/gpio.h"
 / {
 	compatible = "brcm,bcm2708", "brcm,bcm2709";
 
@@ -31,13 +32,21 @@
 			status = "okay";
 
 			ad9833@0{
-				#clock-cells = <0>;
-				compatible = "ad9833";
+				compatible = "adi,ad7616";
 				reg = <0>;
 				spi-max-frequency = <1000000>;
 				spi-cpol;
-				clocks = <&osc>;
-				vcc-supply = <&vcc>;
+
+				avcc-supply = <&vcc>;
+
+				interrupts = <25 2>;
+				interrupt-parent = <&gpio>;
+
+				adi,conversion-start-gpios = <&gpio 2 GPIO_ACTIVE_HIGH>;
+				reset-gpios = <&gpio 27 GPIO_ACTIVE_LOW>;
+				adi,oversampling-ratio-gpios = <&gpio 18 GPIO_ACTIVE_HIGH
+								&gpio 23 GPIO_ACTIVE_HIGH
+								&gpio 26 GPIO_ACTIVE_HIGH>;
 			};
 		};
 	};
