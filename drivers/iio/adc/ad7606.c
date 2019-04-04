@@ -41,6 +41,7 @@
 #define AD7606_WR_FLAG_MSK(x)		((x) & 0x3F)
 
 static int ad7606B_sw_mode_config(struct iio_dev *indio_dev);
+static int ad7616_sw_mode_config(struct iio_dev *indio_dev);
 
 /*
  * Scales are computed as 5000/32768 and 10000/32768 respectively,
@@ -509,6 +510,7 @@ static const struct ad7606_chip_info ad7606_chip_info_tbl[] = {
 	[ID_AD7616] = {
 		.channels = ad7616_channels,
 		.num_channels = 17,
+		.sw_mode_config = ad7616_sw_mode_config,
 		.oversampling_avail = ad7616_oversampling_avail,
 		.oversampling_num = ARRAY_SIZE(ad7616_oversampling_avail),
 		.os_req_reset = true,
@@ -680,6 +682,45 @@ static int ad7606B_sw_mode_config(struct iio_dev *indio_dev)
 		 * in software mode.
 		 */
 		indio_dev->channels = ad7606B_channels;
+	}
+
+	return 0;
+}
+
+static int ad7616_sw_mode_config(struct iio_dev *indio_dev)
+{
+	struct ad7606_state *st = iio_priv(indio_dev);
+	unsigned int buf[3];
+
+	/*
+	 * Software mode is enabled when all three oversampling
+	 * pins are set to high. If oversampling gpios are defined
+	 * in the device tree, then they need to be set to high,
+	 * otherwise, they must be hardwired to VDD
+	 */
+	printk("AD7616 sw_mode");
+	st->sw_mode_en = device_property_present(st->dev, "adi,sw-mode");
+	if (st->sw_mode_en) {
+		printk("AD7616 sw_mode enabled");
+		if (st->gpio_os) {
+			memset32(buf, 1, ARRAY_SIZE(buf));
+			gpiod_set_array_value(ARRAY_SIZE(buf),
+					      st->gpio_os->desc, buf);
+		}
+		/* Scale of 0.076293 is only available in sw mode */
+		st->scale_avail = ad7606B_scale_avail;
+		st->num_scales = ARRAY_SIZE(ad7606B_scale_avail);
+		/* OS of 128 and 256 are available only in software mode */
+		st->oversampling_avail = ad7606B_oversampling_avail;
+		st->num_os_ratios = ARRAY_SIZE(ad7606B_oversampling_avail);
+		/* After reset, in software mode, ±10 V is set by default */
+		memset32(st->range, 2, ARRAY_SIZE(st->range));
+		indio_dev->info = &ad7606_info_os_and_range;
+		/*
+		 * Scale can be configured individually for each channel
+		 * in software mode.
+		 */
+		//indio_dev->channels = ad7606B_channels;
 	}
 
 	return 0;
