@@ -47,7 +47,6 @@
 				adi,oversampling-ratio-gpios = <&gpio 18 GPIO_ACTIVE_HIGH
 								&gpio 23 GPIO_ACTIVE_HIGH
 								&gpio 26 GPIO_ACTIVE_HIGH>;
-				adi,sw-mode;
 			};
 		};
 	};

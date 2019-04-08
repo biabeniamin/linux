@@ -85,10 +85,10 @@ static int ad7606_spi_reg_read(struct ad7606_state *st, unsigned int addr)
 	struct spi_transfer t[] = {
 		{
 			.tx_buf = &st->data[0],
-			.len = 4,
+			.len = 2,
 			.cs_change = 0,
 		}, {
-			.rx_buf = &st->data[5],
+			.rx_buf = &st->data[10],
 			.len = 2,
 		},
 	};
@@ -101,7 +101,7 @@ static int ad7606_spi_reg_read(struct ad7606_state *st, unsigned int addr)
 	if (ret < 0)
 		return ret;
 
-	return be16_to_cpu(st->data[1]);
+	return be16_to_cpu(st->data[10]);
 }
 
 static int ad7606_spi_reg_write(struct ad7606_state *st,
@@ -211,7 +211,29 @@ error_ret:
 
 	return ret;
 }
+static int ad7606_reg_access(struct iio_dev *indio_dev,
+			     unsigned int reg,
+			     unsigned int writeval,
+			     unsigned int *readval)
+{
+	struct ad7606_state *st = iio_priv(indio_dev);
+	int ret;
 
+	mutex_lock(&st->lock);
+	if (readval) {
+		ret = ad7606_spi_reg_read(st, reg);
+		if (ret < 0)
+			goto err_unlock;
+		*readval = ret;
+		ret = 0;
+	} else {
+		ret = ad7606_spi_reg_write(st, reg, writeval);
+	}
+err_unlock:
+	mutex_unlock(&st->lock);
+
+	return ret;
+}
 static int ad7606_read_raw(struct iio_dev *indio_dev,
 			   struct iio_chan_spec const *chan,
 			   int *val,
@@ -223,10 +245,10 @@ static int ad7606_read_raw(struct iio_dev *indio_dev,
 
 	switch (m) {
 	case IIO_CHAN_INFO_RAW:
-		ad7606_spi_reg_write(st, 0x7, 255);
-		return 0;
-		ad7606_spi_reg_read(st, 0x3);
-		ret = ad7606_spi_reg_write(st, 0x3, 7);
+		//ad7606_spi_reg_write(st, 0x6, 68);
+		//return 0;
+		//ad7606_spi_reg_read(st, 0x3);
+		//ret = ad7606_spi_reg_write(st, 0x3, 7);
 		ret = iio_device_claim_direct_mode(indio_dev);
 		if (ret)
 			return ret;
@@ -239,7 +261,7 @@ static int ad7606_read_raw(struct iio_dev *indio_dev,
 		*val = (short)ret;
 		return IIO_VAL_INT;
 	case IIO_CHAN_INFO_SCALE:
-		ad7606_spi_reg_read(st, 0x7);
+		ad7606_spi_reg_read(st, 0x6);
 		return 0;
 		if (st->sw_mode_en)
 			ch = chan->address;
@@ -652,6 +674,7 @@ static const struct iio_info ad7606_info_os_and_range = {
 	.write_raw = &ad7606_write_raw,
 	.attrs = &ad7606_attribute_group_os_and_range,
 	.validate_trigger = &ad7606_validate_trigger,
+	.debugfs_reg_access = &ad7606_reg_access,
 };
 
 static const struct iio_info ad7606_info_os = {
@@ -660,6 +683,7 @@ static const struct iio_info ad7606_info_os = {
 	.write_raw = &ad7606_write_raw,
 	.attrs = &ad7606_attribute_group_os,
 	.validate_trigger = &ad7606_validate_trigger,
+	.debugfs_reg_access = &ad7606_reg_access,
 };
 
 static const struct iio_info ad7606_info_range = {
@@ -668,6 +692,7 @@ static const struct iio_info ad7606_info_range = {
 	.write_raw = &ad7606_write_raw,
 	.attrs = &ad7606_attribute_group_range,
 	.validate_trigger = &ad7606_validate_trigger,
+	.debugfs_reg_access = &ad7606_reg_access,
 };
 
 static const struct iio_trigger_ops ad7606_trigger_ops = {
