@@ -29,7 +29,7 @@
 
 #include "ad7606.h"
 
-#define AD7606_RANGE_CH_ADDR(ch)	(0x03 + ((ch) >> 1))
+#define AD7606_RANGE_CH_ADDR(ch)	(0x04 + ((ch) >> 1))
 #define AD7606_OS_MODE			0x08
 
 /* AD7606_RANGE_CH_X_Y */
@@ -85,16 +85,17 @@ static int ad7606_spi_reg_read(struct ad7606_state *st, unsigned int addr)
 	struct spi_transfer t[] = {
 		{
 			.tx_buf = &st->data[0],
-			.len = 2,
+			.len = 4,
 			.cs_change = 0,
 		}, {
-			.rx_buf = &st->data[1],
+			.rx_buf = &st->data[5],
 			.len = 2,
 		},
 	};
 	int ret;
 
-	st->data[0] = cpu_to_be16(AD7606_RD_FLAG_MSK(addr) << 8);
+	st->data[0] = cpu_to_be16(addr << 9);
+	printk("%x", st->data[0]);
 
 	ret = spi_sync_transfer(spi, t, ARRAY_SIZE(t));
 	if (ret < 0)
@@ -109,8 +110,8 @@ static int ad7606_spi_reg_write(struct ad7606_state *st,
 {
 	struct spi_device *spi = to_spi_device(st->dev);
 
-	st->data[0] = cpu_to_be16((AD7606_WR_FLAG_MSK(addr) << 8) |
-				  (val & 0xFF));
+	st->data[0] = cpu_to_be16((1 << 15) | (addr << 9) |
+				  (val & 0xFF) );
 
 	return spi_write(spi, &st->data[0], sizeof(st->data[0]));
 }
@@ -222,6 +223,10 @@ static int ad7606_read_raw(struct iio_dev *indio_dev,
 
 	switch (m) {
 	case IIO_CHAN_INFO_RAW:
+		ad7606_spi_reg_write(st, 0x7, 255);
+		return 0;
+		ad7606_spi_reg_read(st, 0x3);
+		ret = ad7606_spi_reg_write(st, 0x3, 7);
 		ret = iio_device_claim_direct_mode(indio_dev);
 		if (ret)
 			return ret;
@@ -234,6 +239,8 @@ static int ad7606_read_raw(struct iio_dev *indio_dev,
 		*val = (short)ret;
 		return IIO_VAL_INT;
 	case IIO_CHAN_INFO_SCALE:
+		ad7606_spi_reg_read(st, 0x7);
+		return 0;
 		if (st->sw_mode_en)
 			ch = chan->address;
 		*val = 0;
@@ -284,6 +291,11 @@ static int ad7606_write_raw(struct iio_dev *indio_dev,
 
 	switch (mask) {
 	case IIO_CHAN_INFO_SCALE:
+
+		ad7606_spi_reg_read(st, 0x2);
+		ad7606_spi_reg_write(st, 0x2, 96);
+		ad7606_spi_reg_read(st, 0x2);
+		return 0;
 		mutex_lock(&st->lock);
 		i = find_closest(val2, st->scale_avail, st->num_scales);
 		/*
@@ -476,6 +488,25 @@ static const struct iio_chan_spec ad7616_channels[] = {
 	AD7606_CHANNEL(15),
 };
 
+static const struct iio_chan_spec ad7616_soft_channels[] = {
+	IIO_CHAN_SOFT_TIMESTAMP(16),
+	AD7606B_CHANNEL(0),
+	AD7606B_CHANNEL(1),
+	AD7606B_CHANNEL(2),
+	AD7606B_CHANNEL(3),
+	AD7606B_CHANNEL(4),
+	AD7606B_CHANNEL(5),
+	AD7606B_CHANNEL(6),
+	AD7606B_CHANNEL(7),
+	AD7606B_CHANNEL(8),
+	AD7606B_CHANNEL(9),
+	AD7606B_CHANNEL(10),
+	AD7606B_CHANNEL(11),
+	AD7606B_CHANNEL(12),
+	AD7606B_CHANNEL(13),
+	AD7606B_CHANNEL(14),
+	AD7606B_CHANNEL(15),
+};
 static const struct ad7606_chip_info ad7606_chip_info_tbl[] = {
 	/* More devices added in future */
 	[ID_AD7605_4] = {
@@ -720,7 +751,8 @@ static int ad7616_sw_mode_config(struct iio_dev *indio_dev)
 		 * Scale can be configured individually for each channel
 		 * in software mode.
 		 */
-		//indio_dev->channels = ad7606B_channels;
+		indio_dev->channels = ad7616_soft_channels;
+		
 	}
 
 	return 0;
