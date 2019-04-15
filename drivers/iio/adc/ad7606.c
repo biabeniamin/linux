@@ -29,13 +29,13 @@
 
 #include "ad7606.h"
 
-#define AD7606_RANGE_CH_ADDR(ch)	(0x04 + ((ch) >> 1))
+#define AD7606_RANGE_CH_ADDR(ch)	(0x04 + ((ch) & 0x1)*0x2 + ((ch) >> 3))
 #define AD7606_OS_MODE			0x08
 
 /* AD7606_RANGE_CH_X_Y */
-#define AD7606_RANGE_CH_MSK(ch)		(GENMASK(3, 0) << (4 * ((ch) % 2)))
+#define AD7606_RANGE_CH_MSK(ch)		(GENMASK(1, 0) << (((ch>>1) & 0x3)*0x2))
 #define AD7606_RANGE_CH_MODE(ch, mode)	\
-	((GENMASK(3, 0) & mode) << (4 * ((ch) % 2)))
+	((GENMASK(1, 0) & (mode+1)) << (((ch>>1) & 0x3)*0x2))
 
 #define AD7606_RD_FLAG_MSK(x)		(BIT(6) | ((x) & 0x3F))
 #define AD7606_WR_FLAG_MSK(x)		((x) & 0x3F)
@@ -86,22 +86,22 @@ static int ad7606_spi_reg_read(struct ad7606_state *st, unsigned int addr)
 		{
 			.tx_buf = &st->data[0],
 			.len = 2,
-			.cs_change = 0,
+			.cs_change = 1,
 		}, {
-			.rx_buf = &st->data[10],
+			.rx_buf = &st->data[1],
 			.len = 2,
 		},
 	};
-	int ret;
 
 	st->data[0] = cpu_to_be16(addr << 9);
+	st->data[1]=0;
 	printk("%x", st->data[0]);
 
-	ret = spi_sync_transfer(spi, t, ARRAY_SIZE(t));
+	int ret=spi_sync_transfer(spi, t, ARRAY_SIZE(t));
 	if (ret < 0)
 		return ret;
 
-	return be16_to_cpu(st->data[10]);
+	return be16_to_cpu(st->data[1]);
 }
 
 static int ad7606_spi_reg_write(struct ad7606_state *st,
@@ -112,7 +112,9 @@ static int ad7606_spi_reg_write(struct ad7606_state *st,
 
 	st->data[0] = cpu_to_be16((1 << 15) | (addr << 9) |
 				  (val & 0xFF) );
+	st->data[1]=0;
 
+	gpiod_set_value(st->gpio_convst, 0);
 	return spi_write(spi, &st->data[0], sizeof(st->data[0]));
 }
 
@@ -129,6 +131,8 @@ static int ad7606_spi_write_mask(struct ad7606_state *st,
 
 	readval &= ~mask;
 	readval |= val;
+
+	printk("write mask with %x %x %x and write %x \n",addr,mask,val, readval);
 
 	return ad7606_spi_reg_write(st, addr, readval);
 }
@@ -245,10 +249,6 @@ static int ad7606_read_raw(struct iio_dev *indio_dev,
 
 	switch (m) {
 	case IIO_CHAN_INFO_RAW:
-		//ad7606_spi_reg_write(st, 0x6, 68);
-		//return 0;
-		//ad7606_spi_reg_read(st, 0x3);
-		//ret = ad7606_spi_reg_write(st, 0x3, 7);
 		ret = iio_device_claim_direct_mode(indio_dev);
 		if (ret)
 			return ret;
@@ -261,8 +261,6 @@ static int ad7606_read_raw(struct iio_dev *indio_dev,
 		*val = (short)ret;
 		return IIO_VAL_INT;
 	case IIO_CHAN_INFO_SCALE:
-		ad7606_spi_reg_read(st, 0x6);
-		return 0;
 		if (st->sw_mode_en)
 			ch = chan->address;
 		*val = 0;
@@ -314,10 +312,6 @@ static int ad7606_write_raw(struct iio_dev *indio_dev,
 	switch (mask) {
 	case IIO_CHAN_INFO_SCALE:
 
-		ad7606_spi_reg_read(st, 0x2);
-		ad7606_spi_reg_write(st, 0x2, 96);
-		ad7606_spi_reg_read(st, 0x2);
-		return 0;
 		mutex_lock(&st->lock);
 		i = find_closest(val2, st->scale_avail, st->num_scales);
 		/*
@@ -758,17 +752,9 @@ static int ad7616_sw_mode_config(struct iio_dev *indio_dev)
 	st->sw_mode_en = device_property_present(st->dev, "adi,sw-mode");
 	if (st->sw_mode_en) {
 		printk("AD7616 sw_mode enabled");
-		if (st->gpio_os) {
-			memset32(buf, 1, ARRAY_SIZE(buf));
-			gpiod_set_array_value(ARRAY_SIZE(buf),
-					      st->gpio_os->desc, buf);
-		}
 		/* Scale of 0.076293 is only available in sw mode */
 		st->scale_avail = ad7606B_scale_avail;
 		st->num_scales = ARRAY_SIZE(ad7606B_scale_avail);
-		/* OS of 128 and 256 are available only in software mode */
-		st->oversampling_avail = ad7606B_oversampling_avail;
-		st->num_os_ratios = ARRAY_SIZE(ad7606B_oversampling_avail);
 		/* After reset, in software mode, ±10 V is set by default */
 		memset32(st->range, 2, ARRAY_SIZE(st->range));
 		indio_dev->info = &ad7606_info_os_and_range;
@@ -778,6 +764,16 @@ static int ad7616_sw_mode_config(struct iio_dev *indio_dev)
 		 */
 		indio_dev->channels = ad7616_soft_channels;
 		
+		/* Activate Burst mode and SEQEN MODE */
+		ad7606_spi_write_mask(st,
+				      0x2,
+				      BIT(6) | BIT(5),
+				      BIT(6) | BIT(5));
+		
+		/* Select channels for the next conversion */
+		ad7606_spi_reg_write(st,
+					0x3,
+					0x7);
 	}
 
 	return 0;
